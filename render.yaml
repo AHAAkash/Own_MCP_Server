@@ -1,0 +1,32 @@
+services:
+  - type: web
+    name: own-mcp-server
+    runtime: python
+    plan: starter
+    region: oregon
+    buildCommand: python -m pip install .
+    startCommand: python server.py --transport http --host 0.0.0.0 --port $PORT
+    healthCheckPath: /ready
+    disk:
+      name: mcp-tenant-data
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.8
+      - key: MCP_JWT_SECRET
+        generateValue: true
+      - key: MCP_JWT_ISSUER
+        value: https://auth.local.invalid
+      - key: MCP_JWT_AUDIENCE
+        value: advanced-mcp
+      - key: MCP_DATA_DIR
+        value: /var/data
+      - key: MCP_RATE_LIMIT_PER_MINUTE
+        value: "60"
+      - key: MCP_SESSION_IDLE_TIMEOUT_SECONDS
+        value: "1800"
+      - key: MCP_MAX_SESSIONS
+        value: "1000"
+      - key: MCP_MAX_FILE_BYTES
+        value: "200000"

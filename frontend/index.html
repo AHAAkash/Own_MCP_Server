@@ -1,0 +1,337 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MCP workflow dashboard</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #0b1020;
+      color: #edf2ff;
+      font-synthesis: none;
+      --muted: #9ca9c4;
+      --line: #26304b;
+      --accent: #9b8cff;
+      --panel: #121a2d;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-width: 320px; background: radial-gradient(ellipse at 14% 0%, #1a2140 0, transparent 38%), #0b1020; }
+    main { width: min(1120px, calc(100% - 40px)); margin: 0 auto; padding: 54px 0 72px; }
+    .eyebrow { color: #b7adff; font-size: 12px; font-weight: 700; letter-spacing: .15em; text-transform: uppercase; }
+    header { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; margin-bottom: 32px; }
+    h1 { margin: 10px 0 8px; font-size: clamp(32px, 5vw, 48px); letter-spacing: -.045em; }
+    .subtitle { margin: 0; color: var(--muted); line-height: 1.6; }
+    button { border: 0; border-radius: 10px; padding: 12px 18px; color: #100e20; background: #b6aaff; font: inherit; font-weight: 750; cursor: pointer; white-space: nowrap; }
+    button:hover { background: #c8bfff; }
+    button:disabled { opacity: .55; cursor: wait; }
+    .status-row { display: flex; align-items: center; gap: 10px; margin-bottom: 24px; color: var(--muted); font-size: 13px; }
+    .dot { width: 9px; height: 9px; border-radius: 50%; background: #68728b; }
+    .dot.running { background: #ffc66d; box-shadow: 0 0 14px #ffc66d88; animation: pulse 1s infinite alternate; }
+    .dot.done { background: #67dfad; }
+    @keyframes pulse { to { opacity: .45; } }
+    .pipeline { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-bottom: 28px; }
+    .step, .panel { border: 1px solid var(--line); background: #10182a; border-radius: 14px; }
+    .step { min-height: 95px; padding: 15px; }
+    .step-number { color: var(--accent); font-size: 11px; font-weight: 750; letter-spacing: .1em; }
+    .step strong { display: block; margin-top: 10px; font-size: 14px; }
+    .step span { display: block; margin-top: 5px; color: var(--muted); font-size: 12px; }
+    .content { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(280px, .7fr); gap: 18px; align-items: start; }
+    .panel { overflow: hidden; }
+    .panel-heading { padding: 18px 20px; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; align-items: center; }
+    h2 { margin: 0; font-size: 15px; }
+    .counter { color: var(--muted); font-size: 12px; }
+    .filter { border: 1px solid var(--line); border-radius: 7px; padding: 6px 8px; color: #edf2ff; background: #10182a; font: inherit; font-size: 12px; }
+    .heading-tools { display: flex; align-items: center; gap: 12px; }
+    #timeline { padding: 4px 20px 20px; max-height: 620px; overflow: auto; }
+    .event { position: relative; padding: 16px 0 0 21px; }
+    .event::before { content: ""; position: absolute; left: 3px; top: 23px; bottom: -14px; width: 1px; background: var(--line); }
+    .event:last-child::before { display: none; }
+    .event::after { content: ""; position: absolute; left: 0; top: 21px; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
+    .event[data-type="progress"]::after, .event[data-type="log"]::after { background: #ffc66d; }
+    .event[data-type="error"]::after { background: #ff7777; }
+    .event[data-type="complete"]::after, .event[data-type="security"]::after { background: #67dfad; }
+    .event-title { font-size: 13px; font-weight: 700; }
+    .event-time { float: right; color: #73809b; font-size: 11px; font-weight: 400; }
+    .event-detail { margin: 7px 0 0; color: var(--muted); font: 12px/1.55 ui-monospace, SFMono-Regular, Consolas, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
+    .event-detail:empty { display: none; }
+    .approval-box { display: grid; gap: 9px; margin-top: 12px; }
+    .approval-box textarea { width: 100%; min-height: 100px; resize: vertical; border: 1px solid var(--line); border-radius: 8px; padding: 10px; color: #edf2ff; background: #0b1020; font: 12px/1.5 ui-monospace, SFMono-Regular, Consolas, monospace; }
+    .approval-actions { display: flex; gap: 8px; }
+    .approval-actions button { padding: 8px 11px; font-size: 12px; }
+    .approval-actions .reject { color: #ffdede; background: #542c3a; }
+    .history-list { display: grid; gap: 9px; padding-left: 18px; color: var(--muted); font-size: 12px; }
+    .history-list li { padding-left: 3px; line-height: 1.5; }
+    .side { display: grid; gap: 18px; }
+    .side .panel-body { padding: 18px 20px; }
+    .learn-section { margin: 30px 0; }
+    .learn-intro { padding: 20px; color: var(--muted); font-size: 14px; line-height: 1.7; }
+    .learn-intro strong { color: #edf2ff; }
+    .learn-intro p { margin: 0 0 12px; }
+    .learn-intro p:last-child { margin-bottom: 0; }
+    .process-diagram { display: flex; align-items: stretch; gap: 10px; padding: 18px 20px 10px; }
+    .process-node { flex: 1; min-width: 0; border: 1px solid var(--line); border-radius: 11px; padding: 13px; color: #edf2ff; background: #0d1425; text-align: left; white-space: normal; }
+    .process-node:hover, .process-node[aria-pressed="true"] { border-color: var(--accent); background: #211e3a; color: #fff; }
+    .process-node .node-number { display: block; color: #b7adff; font-size: 11px; letter-spacing: .1em; }
+    .process-node strong { display: block; margin-top: 8px; font-size: 13px; }
+    .process-node .node-caption { display: block; margin-top: 5px; color: var(--muted); font-size: 11px; font-weight: 400; line-height: 1.45; }
+    .process-arrow { align-self: center; flex: 0 0 auto; color: #68728b; font-size: 20px; }
+    .process-detail { min-height: 118px; margin: 10px 20px 20px; padding: 16px; border-radius: 10px; background: #0d1425; }
+    .process-detail h3 { margin: 0 0 8px; font-size: 14px; }
+    .process-detail p { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.65; }
+    .legend { display: grid; gap: 13px; }
+    .legend-item { display: flex; gap: 11px; align-items: center; color: var(--muted); font-size: 13px; }
+    .legend-icon { width: 28px; height: 28px; display: grid; place-items: center; border-radius: 8px; color: #c9c0ff; background: #252142; font-size: 12px; font-weight: 800; }
+    .note { color: var(--muted); font-size: 12px; line-height: 1.65; }
+    .empty { color: var(--muted); padding: 30px 0; font-size: 13px; }
+    @media (max-width: 780px) { header { align-items: flex-start; flex-direction: column; } .pipeline { grid-template-columns: repeat(2, 1fr); } .content { grid-template-columns: 1fr; } .process-diagram { display: grid; grid-template-columns: 1fr 1fr; } .process-arrow { display: none; } }
+    @media (max-width: 420px) { main { width: calc(100% - 24px); padding-top: 32px; } .pipeline { grid-template-columns: 1fr 1fr; } .process-diagram { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <div>
+        <div class="eyebrow">Model Context Protocol · Live demo</div>
+        <h1>Watch MCP work.</h1>
+        <p class="subtitle">Follow the client/server handshake, tool calls, progress notifications, sampling, and root permissions.</p>
+      </div>
+      <button id="run-button" type="button">Run MCP workflow</button>
+    </header>
+
+    <div class="status-row"><span id="status-dot" class="dot"></span><span id="status-label">Ready · start a workflow to see live events</span></div>
+
+    <section class="pipeline" aria-label="MCP workflow stages">
+      <div class="step"><div class="step-number">01 · CONNECT</div><strong>Initialize</strong><span>Negotiate session capabilities</span></div>
+      <div class="step"><div class="step-number">02 · DISCOVER</div><strong>List tools</strong><span>Discover server capabilities</span></div>
+      <div class="step"><div class="step-number">03 · EXECUTE</div><strong>Call tools</strong><span>Request server-side work</span></div>
+      <div class="step"><div class="step-number">04 · NOTIFY</div><strong>Stream updates</strong><span>Logs and task progress</span></div>
+      <div class="step"><div class="step-number">05 · RESPOND</div><strong>Sampling + roots</strong><span>Client LLM and file access</span></div>
+    </section>
+
+    <section class="panel learn-section" aria-labelledby="mcp-note-title">
+      <div class="panel-heading"><h2 id="mcp-note-title">MCP explained</h2></div>
+      <div class="learn-intro">
+        <p><strong>Model Context Protocol (MCP)</strong> is an open standard that lets an AI application connect to external tools and context through a consistent client–server interface. Think of it as a common plug: an MCP server describes what it can do, and an MCP client can discover and request those capabilities.</p>
+        <p>We use MCP to connect models to useful, permissioned capabilities—such as searching approved project files—without building a separate integration for every AI app. The client stays in control of what it shares, while the server validates and performs the requested operation.</p>
+      </div>
+      <div class="panel-heading"><h2>Process diagram · select a step to read more</h2><span class="counter">Client ↔ MCP server</span></div>
+      <div class="process-diagram" role="group" aria-label="Interactive MCP request flow">
+        <button class="process-node" type="button" data-step="connect" aria-pressed="true">
+          <span class="node-number">01 · CLIENT</span><strong>Connect</strong><span class="node-caption">Initialize the session</span>
+        </button>
+        <span class="process-arrow" aria-hidden="true">→</span>
+        <button class="process-node" type="button" data-step="discover" aria-pressed="false">
+          <span class="node-number">02 · SERVER</span><strong>Discover</strong><span class="node-caption">List available tools</span>
+        </button>
+        <span class="process-arrow" aria-hidden="true">→</span>
+        <button class="process-node" type="button" data-step="request" aria-pressed="false">
+          <span class="node-number">03 · CLIENT → SERVER</span><strong>Request</strong><span class="node-caption">Call a tool with inputs</span>
+        </button>
+        <span class="process-arrow" aria-hidden="true">→</span>
+        <button class="process-node" type="button" data-step="execute" aria-pressed="false">
+          <span class="node-number">04 · SERVER</span><strong>Execute</strong><span class="node-caption">Check access and do work</span>
+        </button>
+        <span class="process-arrow" aria-hidden="true">→</span>
+        <button class="process-node" type="button" data-step="respond" aria-pressed="false">
+          <span class="node-number">05 · SERVER → CLIENT</span><strong>Respond</strong><span class="node-caption">Return results and updates</span>
+        </button>
+      </div>
+      <div id="process-detail" class="process-detail" aria-live="polite">
+        <h3>1. Connect · initialize</h3>
+        <p>The MCP client opens a session and negotiates protocol capabilities with the server. This establishes which features—such as tools, roots, or sampling—are available for this connection.</p>
+      </div>
+    </section>
+
+    <div class="content">
+      <section class="panel">
+        <div class="panel-heading"><h2>Live event timeline</h2><div class="heading-tools"><span id="event-count" class="counter">0 events</span><select id="event-filter" class="filter" aria-label="Filter events"><option value="all">All events</option><option value="tools">Tools</option><option value="notifications">Logs + progress</option><option value="sampling">Sampling</option></select></div></div>
+        <div id="timeline" aria-live="polite"><div class="empty">Your MCP session events will appear here.</div></div>
+      </section>
+      <aside class="side">
+        <section class="panel">
+          <div class="panel-heading"><h2>Recent run history</h2></div>
+          <div class="panel-body"><ol id="run-history" class="history-list"><li>No runs yet</li></ol></div>
+        </section>
+        <section class="panel">
+          <div class="panel-heading"><h2>What this demonstrates</h2></div>
+          <div class="panel-body legend">
+            <div class="legend-item"><span class="legend-icon">↔</span>Initialize handshake and tool discovery</div>
+            <div class="legend-item"><span class="legend-icon">●</span>Server logs and progress notifications</div>
+            <div class="legend-item"><span class="legend-icon">AI</span>Server-to-client sampling request</div>
+            <div class="legend-item"><span class="legend-icon">⌂</span>Client-granted roots and path boundary</div>
+          </div>
+        </section>
+        <section class="panel">
+          <div class="panel-heading"><h2>About this run</h2></div>
+          <div class="panel-body"><div class="note">This loopback-only dashboard starts the local stdio client. Sampling pauses for approval or prompt editing before a local stub (or configured <code>ANTHROPIC_API_KEY</code>) responds. Recent run summaries stay in memory and are cleared when the dashboard restarts.</div></div>
+        </section>
+      </aside>
+    </div>
+  </main>
+  <script>
+    const runButton = document.querySelector("#run-button");
+    const timeline = document.querySelector("#timeline");
+    const eventCount = document.querySelector("#event-count");
+    const statusDot = document.querySelector("#status-dot");
+    const statusLabel = document.querySelector("#status-label");
+    const eventFilter = document.querySelector("#event-filter");
+    const runHistory = document.querySelector("#run-history");
+    const processDetail = document.querySelector("#process-detail");
+    let knownEvents = 0;
+    let knownRuns = -1;
+    const processSteps = {
+      connect: {
+        title: "1. Connect · initialize",
+        body: "The MCP client opens a session and negotiates protocol capabilities with the server. This establishes which features—such as tools, roots, or sampling—are available for this connection."
+      },
+      discover: {
+        title: "2. Discover · list capabilities",
+        body: "The client asks the server what tools it exposes and receives their names, descriptions, and input schemas. The model can then choose a suitable tool instead of relying on a custom integration."
+      },
+      request: {
+        title: "3. Request · call a tool",
+        body: "The client sends a structured tool name and arguments using MCP. In this project, for example, it can request a file search or a long-running task; progress and log notifications can accompany the request."
+      },
+      execute: {
+        title: "4. Execute · validate and enforce",
+        body: "The server checks the caller's permissions and validates the inputs before performing the work. Here, file operations are limited to the caller's granted workspace, and unsafe paths are rejected."
+      },
+      respond: {
+        title: "5. Respond · return context",
+        body: "The server returns a structured result to the client. Where supported and authorized, the server may also ask the client for sampling; the client controls that model request and sends the response back."
+      }
+    };
+
+    for (const button of document.querySelectorAll(".process-node")) {
+      button.addEventListener("click", () => {
+        const step = processSteps[button.dataset.step];
+        if (!step) return;
+        for (const node of document.querySelectorAll(".process-node")) {
+          node.setAttribute("aria-pressed", String(node === button));
+        }
+        const heading = document.createElement("h3");
+        heading.textContent = step.title;
+        const description = document.createElement("p");
+        description.textContent = step.body;
+        processDetail.replaceChildren(heading, description);
+      });
+    }
+
+    function applyFilter() {
+      for (const event of timeline.querySelectorAll(".event")) {
+        const type = event.dataset.type;
+        const filter = eventFilter.value;
+        const visible = filter === "all" ||
+          (filter === "tools" && ["tool", "result", "tools"].includes(type)) ||
+          (filter === "notifications" && ["log", "progress"].includes(type)) ||
+          (filter === "sampling" && ["sampling", "approval_required"].includes(type));
+        event.hidden = !visible;
+      }
+    }
+
+    function addEvent(item) {
+      if (knownEvents === 0) timeline.replaceChildren();
+      const article = document.createElement("article");
+      article.className = "event";
+      article.dataset.type = item.type || "event";
+      const heading = document.createElement("div");
+      heading.className = "event-title";
+      heading.textContent = item.title || item.type || "MCP event";
+      const time = document.createElement("span");
+      time.className = "event-time";
+      time.textContent = new Date().toLocaleTimeString();
+      heading.append(time);
+      const detail = document.createElement("pre");
+      detail.className = "event-detail";
+      detail.textContent = item.detail || "";
+      article.append(heading, detail);
+      if (item.type === "approval_required") {
+        const box = document.createElement("div");
+        box.className = "approval-box";
+        const prompt = document.createElement("textarea");
+        prompt.setAttribute("aria-label", "Review or edit the sampling prompt");
+        prompt.value = item.detail || "";
+        const actions = document.createElement("div");
+        actions.className = "approval-actions";
+        for (const action of [{ label: "Approve prompt", approved: true }, { label: "Reject", approved: false }]) {
+          const button = document.createElement("button");
+          button.type = "button";
+          button.textContent = action.label;
+          if (!action.approved) button.className = "reject";
+          button.addEventListener("click", async () => {
+            button.disabled = true;
+            try {
+              const response = await fetch(`/api/sampling/${encodeURIComponent(item.approval_id)}`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ approved: action.approved, prompt: prompt.value })
+              });
+              if (!response.ok) throw new Error((await response.json()).error || "Could not resolve approval");
+              box.replaceChildren(document.createTextNode(action.approved ? "Approved" : "Rejected"));
+            } catch (error) {
+              button.disabled = false;
+              statusLabel.textContent = error.message;
+            }
+          });
+          actions.append(button);
+        }
+        box.append(prompt, actions);
+        article.append(box);
+      }
+      timeline.append(article);
+      knownEvents += 1;
+      eventCount.textContent = `${knownEvents} event${knownEvents === 1 ? "" : "s"}`;
+      applyFilter();
+      timeline.scrollTop = timeline.scrollHeight;
+    }
+
+    async function refresh() {
+      try {
+        const response = await fetch("/api/state", { cache: "no-store" });
+        const state = await response.json();
+        for (const item of state.events.slice(knownEvents)) addEvent(item);
+        if (knownRuns !== state.runs.length) {
+          knownRuns = state.runs.length;
+          runHistory.replaceChildren();
+          if (!state.runs.length) {
+            runHistory.append(Object.assign(document.createElement("li"), { textContent: "No runs yet" }));
+          } else {
+            for (const run of state.runs) {
+              const entry = document.createElement("li");
+              const time = new Date(run.started_at * 1000).toLocaleString();
+              entry.textContent = `${time} · ${run.status} · ${run.events} events`;
+              runHistory.append(entry);
+            }
+          }
+        }
+        runButton.disabled = state.running;
+        statusDot.className = `dot${state.running ? " running" : knownEvents ? " done" : ""}`;
+        statusLabel.textContent = state.running ? "Workflow running · receiving MCP events" :
+          knownEvents ? "Workflow finished" : "Ready · start a workflow to see live events";
+      } catch (error) {
+        statusDot.className = "dot";
+        statusLabel.textContent = `Dashboard connection error: ${error.message}`;
+      }
+    }
+
+    runButton.addEventListener("click", async () => {
+      try {
+        knownEvents = 0;
+        timeline.replaceChildren();
+        eventCount.textContent = "0 events";
+        const response = await fetch("/api/run", { method: "POST" });
+        if (!response.ok) throw new Error((await response.json()).error || "Could not start workflow");
+        await refresh();
+      } catch (error) {
+        statusLabel.textContent = error.message;
+      }
+    });
+
+    eventFilter.addEventListener("change", applyFilter);
+    refresh();
+    window.setInterval(refresh, 500);
+  </script>
+</body>
+</html>
