@@ -1,0 +1,16 @@
+.git
+.venv
+.mypy_cache
+.pytest_cache
+__pycache__
+*.py[cod]
+.mcp-data
+.env
+.env.*
+build
+dist
+*.egg-info
+tests
+frontend
+client.py
+webapp.py

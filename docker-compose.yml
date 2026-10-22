@@ -1,0 +1,24 @@
+services:
+  mcp-server:
+    build: .
+    ports:
+      - "127.0.0.1:8000:8000"
+    environment:
+      MCP_JWT_SECRET: "${MCP_JWT_SECRET:?Set MCP_JWT_SECRET to a random value of at least 32 characters}"
+      MCP_JWT_ISSUER: "${MCP_JWT_ISSUER:-advanced-mcp-local}"
+      MCP_JWT_AUDIENCE: "${MCP_JWT_AUDIENCE:-advanced-mcp}"
+      MCP_DATA_DIR: /var/lib/mcp/data
+      MCP_STATELESS_HTTP: "${MCP_STATELESS_HTTP:-false}"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "${OTEL_EXPORTER_OTLP_ENDPOINT:-}"
+    volumes:
+      - mcp-data:/var/lib/mcp/data
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+volumes:
+  mcp-data:
